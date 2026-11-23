@@ -103,6 +103,8 @@ def main():
     ap.add_argument("--parent", default=PARENT_STRING, help="winebus 父设备字符串")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--undo", action="store_true")
+    ap.add_argument("--check", action="store_true", help="只检查，缺属性时退出码 1（给守护脚本用）")
+    ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 
     wine, prefix = args.wine, args.prefix
@@ -115,10 +117,22 @@ def main():
     guid = container_guid(args.parent)
     eps = endpoints(wine, prefix)
     if not eps:
+        if args.check:
+            sys.exit(1)
         sys.exit("没有找到 DualSense 音频端点。手柄插好了吗？Wine 跑过至少一次吗？")
 
+    if args.check:
+        ok = all(
+            props.get(PKEY_CONTAINER_ID, "").lower() == guid.lower()
+            and props.get(PKEY_PHYSICAL_SPEAKERS, "").lower() == QUAD_SPEAKERS.lower()
+            and props.get(PKEY_FULLRANGE_SPEAKERS, "").lower() == FULLRANGE_MASK.lower()
+            for _, _, props in eps
+        )
+        sys.exit(0 if ok else 1)
+
     for key, name, props in eps:
-        print(f"端点：{name}\n  {key}")
+        if not args.quiet:
+            print(f"端点：{name}\n  {key}")
         if args.list:
             for k in (PKEY_CONTAINER_ID, PKEY_PHYSICAL_SPEAKERS, PKEY_FULLRANGE_SPEAKERS):
                 print(f"    {k} = {props.get(k, '(缺失)')}")
@@ -126,14 +140,16 @@ def main():
         if args.undo:
             for k in (PKEY_CONTAINER_ID, PKEY_PHYSICAL_SPEAKERS, PKEY_FULLRANGE_SPEAKERS):
                 run(wine, prefix, "reg", "delete", key, "/v", k, "/f")
-            print("  已撤销三个属性")
+            if not args.quiet:
+                print("  已撤销三个属性")
             continue
         run(wine, prefix, "reg", "add", key, "/v", PKEY_CONTAINER_ID, "/t", "REG_SZ", "/d", guid, "/f")
         run(wine, prefix, "reg", "add", key, "/v", PKEY_PHYSICAL_SPEAKERS, "/t", "REG_DWORD", "/d", QUAD_SPEAKERS, "/f")
         run(wine, prefix, "reg", "add", key, "/v", PKEY_FULLRANGE_SPEAKERS, "/t", "REG_DWORD", "/d", FULLRANGE_MASK, "/f")
-        print(f"  已写入 containerID {guid}（四声道属性同步写入）")
+        if not args.quiet:
+            print(f"  已写入 containerID {guid}（四声道属性同步写入）")
 
-    if not args.list:
+    if not args.list and not args.quiet:
         print("\n完成。完全退出游戏再重开，然后进游戏试试震动。")
 
 

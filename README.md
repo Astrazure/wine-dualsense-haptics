@@ -57,6 +57,23 @@ python3 fix_dualsense_haptics.py --wine "/Applications/CrossOver.app/Contents/Sh
 
 脚本只动你 prefix 里的注册表，**不碰 Wine 本体**，随时可 `--undo`。
 
+## 属性会丢？装个守护
+
+实测发现一个坑：Wine 给音频端点分配的设备 GUID 是**按 CoreAudio 的设备 UID 算的**，而 DualSense 的 UID 里带了 USB location（换口、重新枚举就会变，例如 `...:1100000:1` → `...:100000:1`）。UID 一变，Wine 就新建一个端点键，我们之前写的属性留在旧的死键上——表现就是「昨天还好好的，今天又没震动了」。
+
+所以提供了守护脚本，游戏运行时每 10 秒检查一次，缺了就补：
+
+```bash
+./install-watcher.sh       # 安装 launchd 任务（每 10s 检查，只在游戏运行时动手）
+./install-watcher.sh --uninstall
+```
+
+> 安装需要在**你自己的终端**里跑（本工具装不了 launchd 任务，权限不够）。
+
+日志：`/tmp/wine-dualsense-haptics.log`。
+
+第一次装上守护后，可能那一局仍然不震（属性补上时游戏已经读完设备列表了），**再开一局就好**。
+
 ## 环境（实测通过）
 
 - macOS 26 / Apple Silicon（M5 Pro）
@@ -71,6 +88,7 @@ python3 fix_dualsense_haptics.py --wine "/Applications/CrossOver.app/Contents/Sh
 - ⚠️ 蓝牙未测试。原神官方明确说不支持蓝牙下的 DualSense 震动，所以蓝牙大概率仍然不震（跟本修复无关）。
 - ⚠️ 其它 Wwise 游戏（幽灵线东京、死亡循环等，以及任何用 containerID 找手柄音频端点的游戏）大概率同样受益，但没逐个测。
 - ⚠️ 每次 Wine 重新枚举设备时属性有可能被重写；如果哪天又没震动了，重跑一次脚本即可。
+- ⚠️ **换 USB 口 / 重新插拔会让 Wine 生成新的设备 GUID**，旧属性失效。这属于已知问题，用上面的守护脚本兜底。
 
 ## License
 

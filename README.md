@@ -57,7 +57,24 @@ python3 fix_dualsense_haptics.py --wine "/Applications/CrossOver.app/Contents/Sh
 
 脚本只动你 prefix 里的注册表，**不碰 Wine 本体**，随时可 `--undo`。
 
-## 属性会丢？装个守护
+## 推荐用法：附着到 Yaagl（不常驻后台）
+
+不想挂开机启动的话，用这个「带震动修复的启动器」代替原来的 Yaagl 图标：
+
+```bash
+./build-app.sh          # 生成 ~/Applications/Yaagl 带震动.app
+```
+
+双击它（或拖到 Dock）即可，流程是：
+
+1. 先补一次属性（USB 口没变的情况下这里就修好了）；
+2. 拉起 Yaagl；
+3. 等你把游戏点起来，再补三次；
+4. **跑完自己退出**，不留常驻进程。
+
+> 它只是 `open -a Yaagl` + 定时跑一次修复脚本，不修改 Yaagl 本体任何文件。
+
+## 属性会丢？装个守护（可选）
 
 实测发现一个坑：Wine 给音频端点分配的设备 GUID 是**按 CoreAudio 的设备 UID 算的**，而 DualSense 的 UID 里带了 USB location（换口、重新枚举就会变，例如 `...:1100000:1` → `...:100000:1`）。UID 一变，Wine 就新建一个端点键，我们之前写的属性留在旧的死键上——表现就是「昨天还好好的，今天又没震动了」。
 
